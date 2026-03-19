@@ -1,0 +1,122 @@
+// ===============================================================
+// Assumed Data Model
+// ===============================================================
+//
+// Collection: /users/{userId}
+// Document ID: {userId} (matches auth.uid)
+// Fields:
+//   - uid: string (required)
+//   - email: string (required)
+//   - displayName: string (optional)
+//   - photoURL: string (optional)
+//   - createdAt: timestamp (required)
+//
+// Collection: /users/{userId}/trips/{tripId}
+// Document ID: {tripId}
+// Fields:
+//   - userId: string (required, matches auth.uid)
+//   - origin: string (required, max 200 chars)
+//   - destination: string (required, max 200 chars)
+//   - distance: number (required, positive)
+//   - duration: number (required, positive)
+//   - consumption: number (required, positive)
+//   - fuelPrice: number (required, positive)
+//   - manualTolls: number (required, positive)
+//   - extraCosts: number (required, positive)
+//   - isRoundTrip: boolean (required)
+//   - totalCost: number (required, positive)
+//   - createdAt: timestamp (required)
+//
+// ===============================================================
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+          (request.auth.token.email == "gestao.grupomar@gmail.com" && request.auth.token.email_verified == true));
+    }
+
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    function uidUnchanged() {
+      return !('uid' in request.resource.data) || request.resource.data.uid == request.auth.uid;
+    }
+
+    function userIdUnchanged() {
+      return !('userId' in request.resource.data) || request.resource.data.userId == request.auth.uid;
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidUser(data) {
+      return hasOnlyAllowedFields(['uid', 'email', 'displayName', 'photoURL', 'createdAt', 'role']) &&
+             data.uid == request.auth.uid &&
+             data.email is string && data.email.size() < 100 &&
+             (!('displayName' in data) || (data.displayName is string && data.displayName.size() < 100)) &&
+             (!('photoURL' in data) || (data.photoURL is string && data.photoURL.size() < 500)) &&
+             data.createdAt is timestamp;
+    }
+
+    function isValidTrip(data) {
+      return hasOnlyAllowedFields(['userId', 'origin', 'destination', 'distance', 'duration', 'consumption', 'fuelPrice', 'manualTolls', 'extraCosts', 'isRoundTrip', 'totalCost', 'createdAt']) &&
+             data.userId == request.auth.uid &&
+             data.origin is string && data.origin.size() > 0 && data.origin.size() < 200 &&
+             data.destination is string && data.destination.size() > 0 && data.destination.size() < 200 &&
+             data.distance is number && data.distance >= 0 &&
+             data.duration is number && data.duration >= 0 &&
+             data.consumption is number && data.consumption > 0 &&
+             data.fuelPrice is number && data.fuelPrice >= 0 &&
+             data.manualTolls is number && data.manualTolls >= 0 &&
+             data.extraCosts is number && data.extraCosts >= 0 &&
+             data.isRoundTrip is bool &&
+             data.totalCost is number && data.totalCost >= 0 &&
+             data.createdAt is timestamp;
+    }
+
+    // ===============================================================
+    // Match Blocks
+    // ===============================================================
+
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isOwner(userId) && isValidUser(request.resource.data) && (!('role' in request.resource.data) || request.resource.data.role == 'user');
+      allow update: if isOwner(userId) && isValidUser(request.resource.data) && (request.resource.data.role == resource.data.role || isAdmin());
+      allow delete: if isAdmin();
+
+      match /trips/{tripId} {
+        allow read: if isOwner(userId) || isAdmin();
+        allow create: if isOwner(userId) && isValidTrip(request.resource.data);
+        allow update: if isOwner(userId) && isValidTrip(request.resource.data) && request.resource.data.createdAt == resource.data.createdAt;
+        allow delete: if isOwner(userId) || isAdmin();
+      }
+    }
+
+    // Default deny
+    match /{path=**} {
+      allow read, write: if false;
+    }
+  }
+}

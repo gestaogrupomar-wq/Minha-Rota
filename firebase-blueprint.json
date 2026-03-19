@@ -1,0 +1,47 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile information",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "displayName": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email"]
+    },
+    "Trip": {
+      "title": "Trip",
+      "description": "A calculated trip with costs and route info",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "origin": { "type": "string" },
+        "destination": { "type": "string" },
+        "distance": { "type": "number" },
+        "duration": { "type": "number" },
+        "consumption": { "type": "number" },
+        "fuelPrice": { "type": "number" },
+        "manualTolls": { "type": "number" },
+        "extraCosts": { "type": "number" },
+        "isRoundTrip": { "type": "boolean" },
+        "totalCost": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "origin", "destination", "manualTolls", "totalCost", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profiles"
+    },
+    "/users/{userId}/trips/{tripId}": {
+      "schema": "Trip",
+      "description": "History of trips for a user"
+    }
+  }
+}

@@ -1,0 +1,5 @@
+{
+  "name": "Minha Rota",
+  "description": "Planeje seus custos de viagem com precisão, incluindo combustível, pedágios e alertas de rodízio.",
+  "requestFramePermissions": ["geolocation"]
+}
